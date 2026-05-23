@@ -5,15 +5,19 @@ from app.models import Job, JobRead
 from app.database import create_db_and_tables, get_session
 from typing import List
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
 app = FastAPI(
     title="JobRadar",
     description="AI-powered job intelligence system",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan
 )
-
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
 
 @app.get("/")
 def root():
