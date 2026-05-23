@@ -6,12 +6,12 @@ REMOTIVE_URL = "https://remotive.com/api/remote-jobs"
 
 async def fetch_jobs_from_remotive(search: str = None) -> list[Job]:
     cache_key = make_cache_key("jobs", search=search)
-    
+
     cached = get_cached(cache_key)
     if cached:
         print(f"CACHE HIT: {cache_key}")
         return [Job(**job) for job in cached]
-    
+
     print(f"CACHE MISS: {cache_key}")
     params = {"limit": 20}
     if search:
