@@ -36,14 +36,15 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Update kubeconfig
+      - name: Update kubeconfig if cluster exists
         run: |
-          aws eks update-kubeconfig \
-            --region ${{ secrets.AWS_REGION }} \
-            --name jobradar
-
-      - name: Verify Kubernetes access
-        run: kubectl get nodes
+          if aws eks describe-cluster --region ${{ secrets.AWS_REGION }} --name jobradar >/dev/null 2>&1; then
+            aws eks update-kubeconfig \
+              --region ${{ secrets.AWS_REGION }} \
+              --name jobradar
+          else
+            echo "EKS cluster does not exist yet. Skipping kubeconfig update."
+          fi
 
       - name: Terraform Init
         run: terraform init
