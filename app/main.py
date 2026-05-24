@@ -14,7 +14,7 @@ import os
 from anthropic import Anthropic
 import time
 from app.logging_config import logger
-
+from fastapi.middleware.cors import CORSMiddleware
 start_time = time.time()
 load_dotenv()
 
@@ -153,7 +153,7 @@ def metrics(session: Session = Depends(get_session)):
         "status": "healthy"
     }
 
-from fastapi.middleware.cors import CORSMiddleware
+
 
 app.add_middleware(
     CORSMiddleware,
