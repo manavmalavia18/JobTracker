@@ -12,9 +12,9 @@ on:
           - gcp
           - both
       image_tag:
-        description: "Image tag to deploy (default: latest)"
+        description: "Image tag to deploy (leave empty to use latest from registry)"
         required: false
-        default: "latest"
+        default: ""
 
 jobs:
   deploy-aws:
@@ -44,10 +44,27 @@ jobs:
             --name jobradar \
             --region ${{ secrets.AWS_REGION }}
 
+      - name: Resolve image tag
+        id: resolve_tag_aws
+        run: |
+          if [ -z "${{ inputs.image_tag }}" ]; then
+            IMAGE_TAG=$(aws ecr describe-images \
+              --repository-name jobradar-api \
+              --region ${{ secrets.AWS_REGION }} \
+              --query 'sort_by(imageDetails,&imagePushedAt)[-1].imageTags[1]' \
+              --output text)
+            echo "Using latest ECR tag: $IMAGE_TAG"
+          else
+            IMAGE_TAG="${{ inputs.image_tag }}"
+            echo "Using provided tag: $IMAGE_TAG"
+          fi
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
       - name: Deploy to EKS
         run: |
+          echo "Deploying image tag: ${{ steps.resolve_tag_aws.outputs.image_tag }}"
           helm upgrade --install jobradar ./charts/jobradar \
-            --set api.image=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/jobradar-api:${{ inputs.image_tag }} \
+            --set api.image=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/jobradar-api:${{ steps.resolve_tag_aws.outputs.image_tag }} \
             --set api.replicas=1
           kubectl rollout status deployment/jobradar-api --timeout=120s
 
@@ -83,10 +100,27 @@ jobs:
           gcloud container clusters get-credentials jobradar \
             --region=${{ secrets.GCP_REGION }}
 
+      - name: Resolve image tag
+        id: resolve_tag_gcp
+        run: |
+          if [ -z "${{ inputs.image_tag }}" ]; then
+            IMAGE_TAG=$(gcloud artifacts docker images list \
+              us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jobradar/jobradar-api \
+              --sort-by=~UPDATE_TIME \
+              --limit=1 \
+              --format='value(tags)' | head -1)
+            echo "Using latest GCR tag: $IMAGE_TAG"
+          else
+            IMAGE_TAG="${{ inputs.image_tag }}"
+            echo "Using provided tag: $IMAGE_TAG"
+          fi
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
       - name: Deploy to GKE
         run: |
+          echo "Deploying image tag: ${{ steps.resolve_tag_gcp.outputs.image_tag }}"
           helm upgrade --install jobradar ./charts/jobradar \
-            --set api.image=us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jobradar/jobradar-api:${{ inputs.image_tag }} \
+            --set api.image=us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jobradar/jobradar-api:${{ steps.resolve_tag_gcp.outputs.image_tag }} \
             --set api.replicas=1
           kubectl rollout status deployment/jobradar-api --timeout=120s
 
