@@ -1,9 +1,9 @@
 terraform {
   required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
-    helm = { source = "hashicorp/helm", version = "~> 2.0" }
+    aws    = { source = "hashicorp/aws", version = "~> 5.0" }
+    helm   = { source = "hashicorp/helm", version = "~> 2.0" }
     argocd = { source = "oboukili/argocd", version = "~> 6.0" }
-    null = { source = "hashicorp/null", version = "~> 3.0" }
+    null   = { source = "hashicorp/null", version = "~> 3.0" }
   }
 }
 
@@ -61,8 +61,15 @@ resource "helm_release" "monitoring" {
   create_namespace = true
   timeout          = 300
 
-  set { name = "grafana.adminPassword", value = var.grafana_password }
-  set { name = "prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues", value = "false" }
+  set {
+    name  = "grafana.adminPassword"
+    value = var.grafana_password
+  }
+
+  set {
+    name  = "prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues"
+    value = "false"
+  }
 
   depends_on = [null_resource.kubeconfig]
 }
@@ -89,19 +96,26 @@ resource "argocd_application" "jobradar" {
     name      = "jobradar"
     namespace = "argocd"
   }
+
   spec {
     source {
       repo_url        = "https://github.com/manavmalavia18/JobTracker"
       path            = "charts/jobradar"
       target_revision = "HEAD"
     }
+
     destination {
       server    = "https://kubernetes.default.svc"
       namespace = "default"
     }
+
     sync_policy {
-      automated { prune = true, self_heal = true }
+      automated {
+        prune     = true
+        self_heal = true
+      }
     }
   }
+
   depends_on = [null_resource.argocd_portforward]
 }
