@@ -53,3 +53,9 @@ variable "domain_name" {
   type    = string
   default = "manavmalavia.org"
 }
+
+variable "argocd_password" {
+  type      = string
+  sensitive = true
+  default   = "jobradar123"
+}
