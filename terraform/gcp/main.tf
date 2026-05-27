@@ -47,6 +47,7 @@ resource "null_resource" "kubeconfig" {
   provisioner "local-exec" {
     command = "gcloud container clusters get-credentials ${var.project_name} --region=${var.gcp_region} --project=${var.gcp_project_id}"
   }
+
   depends_on = [module.gke]
 }
 
@@ -61,6 +62,11 @@ resource "helm_release" "ingress_nginx" {
   set {
     name  = "controller.service.type"
     value = "LoadBalancer"
+  }
+
+  set {
+    name  = "controller.publishService.enabled"
+    value = "true"
   }
 
   depends_on = [null_resource.kubeconfig]
@@ -84,10 +90,11 @@ resource "helm_release" "external_dns" {
         var.domain_name
       ]
 
-      policy = "upsert-only"
-
+      policy     = "upsert-only"
       txtOwnerId = "jobradar-gcp"
 
+      # The external-dns chart rendered invalid probe fields with enabled=false.
+      # Null removes the probes and prevents the GKE pod from being killed by /healthz failures.
       livenessProbe  = null
       readinessProbe = null
 
@@ -127,15 +134,31 @@ resource "helm_release" "monitoring" {
   create_namespace = true
   timeout          = 900
 
-  set {
-    name  = "grafana.adminPassword"
-    value = var.grafana_password
-  }
+  values = [
+    yamlencode({
+      grafana = {
+        adminPassword = var.grafana_password
 
-  set {
-    name  = "prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues"
-    value = "false"
-  }
+        readinessProbe = {
+          initialDelaySeconds = 60
+        }
+
+        livenessProbe = {
+          initialDelaySeconds = 120
+        }
+      }
+
+      prometheus = {
+        prometheusSpec = {
+          serviceMonitorSelectorNilUsesHelmValues = false
+
+          startupProbe = {
+            failureThreshold = 120
+          }
+        }
+      }
+    })
+  ]
 
   depends_on = [null_resource.kubeconfig]
 }
@@ -148,15 +171,36 @@ resource "helm_release" "argocd" {
   create_namespace = true
   timeout          = 300
 
-  set {
-    name  = "configs.secret.argocdServerAdminPassword"
-    value = var.argocd_password_bcrypt
-  }
+  values = [
+    yamlencode({
+      configs = {
+        secret = {
+          argocdServerAdminPassword      = var.argocd_password_bcrypt
+          argocdServerAdminPasswordMtime = "2024-01-01T00:00:00Z"
+        }
+      }
 
-  set {
-    name  = "configs.secret.argocdServerAdminPasswordMtime"
-    value = "2024-01-01T00:00:00Z"
-  }
+      server = {
+        livenessProbe = {
+          initialDelaySeconds = 120
+        }
+
+        readinessProbe = {
+          initialDelaySeconds = 60
+        }
+      }
+
+      repoServer = {
+        livenessProbe = {
+          initialDelaySeconds = 120
+        }
+
+        readinessProbe = {
+          initialDelaySeconds = 60
+        }
+      }
+    })
+  ]
 
   depends_on = [null_resource.kubeconfig]
 }
@@ -171,7 +215,11 @@ resource "null_resource" "ingress_rules" {
       kubectl apply -f ${path.module}/../../k8s/ingress/gcp/argocd-ingress.yaml
     EOT
   }
-  depends_on = [helm_release.cert_manager, helm_release.ingress_nginx]
+
+  depends_on = [
+    helm_release.cert_manager,
+    helm_release.ingress_nginx
+  ]
 }
 
 resource "null_resource" "argocd_app" {
@@ -203,5 +251,6 @@ resource "null_resource" "argocd_app" {
       YAML
     EOT
   }
+
   depends_on = [helm_release.argocd]
 }
