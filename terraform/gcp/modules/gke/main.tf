@@ -5,6 +5,12 @@ resource "google_container_cluster" "main" {
   subnetwork               = var.subnetwork
   initial_node_count       = 1
   remove_default_node_pool = true
+
+  timeouts {
+    create = "60m"
+    update = "60m"
+    delete = "60m"
+  }
   deletion_protection      = false
 }
 
@@ -13,6 +19,12 @@ resource "google_container_node_pool" "workers" {
   location   = var.gcp_region
   cluster    = google_container_cluster.main.name
   node_count = var.node_count
+
+  timeouts {
+    create = "30m"
+    update = "30m"
+    delete = "30m"
+  }
 
   node_config {
     machine_type = var.machine_type
