@@ -72,7 +72,9 @@ resource "helm_release" "external_dns" {
 
   values = [
     yamlencode({
-      provider = "cloudflare"
+      provider = {
+        name = "cloudflare"
+      }
 
       sources = ["ingress"]
 
