@@ -86,7 +86,7 @@ resource "helm_release" "external_dns" {
         var.domain_name
       ]
 
-      policy     = "upsert-only"
+      policy     = "sync"
       txtOwnerId = "jobradar-gcp"
 
       # The external-dns chart rendered invalid probe fields with enabled=false.
