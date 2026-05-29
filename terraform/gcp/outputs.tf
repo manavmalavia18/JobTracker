@@ -7,11 +7,11 @@ output "cluster_endpoint" {
 }
 
 output "artifact_registry_url" {
-  value = module.artifact_registry.repository_url
+  value = "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/${var.project_name}"
 }
 
 output "api_image" {
-  value = "${module.artifact_registry.repository_url}/jobradar-api:${var.api_image_tag}"
+  value = "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/${var.project_name}/jobradar-api:${var.api_image_tag}"
 }
 
 output "api_url" {

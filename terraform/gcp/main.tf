@@ -36,12 +36,6 @@ module "gke" {
   node_count_max = var.node_count_max
 }
 
-module "artifact_registry" {
-  source         = "./modules/artifact_registry"
-  project_name   = var.project_name
-  gcp_project_id = var.gcp_project_id
-  gcp_region     = var.gcp_region
-}
 
 resource "null_resource" "kubeconfig" {
   provisioner "local-exec" {
