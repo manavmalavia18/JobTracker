@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "charts/jobradar/values.yaml"
   pull_request:
     branches: [main]
 
@@ -49,6 +51,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -68,7 +71,7 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker for GCR
+      - name: Configure Docker for GCP Artifact Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
       - name: Set up Docker Buildx
@@ -89,14 +92,24 @@ jobs:
       - name: Update image tag in values.yaml
         run: |
           sed -i "s|image:.*jobradar-api.*|image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/jobradar-api:${{ github.sha }}|" charts/jobradar/values.yaml
+
           git config user.email "ci@jobradar.com"
           git config user.name "CI Bot"
+
           git add charts/jobradar/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "No image tag changes to commit."
+            exit 0
+          fi
+
           git commit -m "ci: update image tag to ${{ github.sha }}"
-          git push
+
+          git pull --rebase origin main
+          git push origin main
 
       - name: Output image tags
         run: |
           echo "Image pushed:"
           echo "  ECR: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/jobradar-api:${{ github.sha }}"
-          echo "  GCR: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jobradar/jobradar-api:${{ github.sha }}"
+          echo "  GAR: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jobradar/jobradar-api:${{ github.sha }}"
